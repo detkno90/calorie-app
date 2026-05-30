@@ -3,10 +3,10 @@ import { supabase } from '../lib/supabase';
 import { useApp } from '../context/AppContext';
 
 const PROTOCOLS = [
-  { label: '16:8', fast: 16, eat: 8,  desc: 'Most popular · 16h fast, 8h eating' },
-  { label: '18:6', fast: 18, eat: 6,  desc: 'Moderate · 18h fast, 6h eating' },
-  { label: '20:4', fast: 20, eat: 4,  desc: 'Advanced · 20h fast, 4h eating' },
-  { label: '23:1', fast: 23, eat: 1,  desc: 'OMAD · One meal a day' },
+  { label: '16:8', fast: 16, desc: 'Most popular · 16h fast, 8h eating' },
+  { label: '18:6', fast: 18, desc: 'Moderate · 18h fast, 6h eating' },
+  { label: '20:4', fast: 20, desc: 'Advanced · 20h fast, 4h eating' },
+  { label: '23:1', fast: 23, desc: 'OMAD · One meal a day' },
 ];
 
 function fmt(ms) {
@@ -19,7 +19,7 @@ function fmt(ms) {
 }
 
 export default function FastingTimer() {
-  const { fastingSession, setFastingSession, fetchFastingSession } = useApp();
+  const { fastingSession, setFastingSession, fetchFastingSession, user } = useApp();
   const [now, setNow] = useState(Date.now());
   const [protocol, setProtocol] = useState(PROTOCOLS[0]);
   const [history, setHistory] = useState([]);
@@ -37,14 +37,17 @@ export default function FastingTimer() {
   }, []);
 
   async function fetchHistory() {
-    const { data } = await supabase.from('fasting_sessions').select('*').eq('active', false).order('created_at', { ascending: false }).limit(5);
+    const { data } = await supabase.from('fasting_sessions').select('*')
+      .eq('active', false).eq('user_id', user.id)
+      .order('created_at', { ascending: false }).limit(5);
     if (data) setHistory(data);
   }
 
   async function startFast() {
     setLoading(true);
-    await supabase.from('fasting_sessions').update({ active: false, end_time: new Date().toISOString() }).eq('active', true);
+    await supabase.from('fasting_sessions').update({ active: false, end_time: new Date().toISOString() }).eq('active', true).eq('user_id', user.id);
     const { data, error } = await supabase.from('fasting_sessions').insert({
+      user_id: user.id,
       protocol: protocol.label, fast_hours: protocol.fast,
       start_time: new Date().toISOString(), active: true, completed: false,
     }).select().single();
@@ -81,28 +84,18 @@ export default function FastingTimer() {
   return (
     <div>
       <div className="page-header">
-        <div>
-          <div className="page-subtitle">Track Your Fast</div>
-          <div className="page-title">Fasting</div>
-        </div>
+        <div><div className="page-subtitle">Track Your Fast</div><div className="page-title">Fasting</div></div>
       </div>
 
       {!fastingSession ? (
         <>
-          {/* Protocol picker */}
           <div className="card">
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 12 }}>CHOOSE PROTOCOL</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {PROTOCOLS.map(p => (
-                <div
-                  key={p.label}
-                  className={`protocol-card ${protocol.label === p.label ? 'active' : ''}`}
-                  onClick={() => setProtocol(p)}
-                >
+                <div key={p.label} className={`protocol-card ${protocol.label === p.label ? 'active' : ''}`} onClick={() => setProtocol(p)}>
                   <div className={`protocol-badge ${protocol.label === p.label ? 'active' : ''}`}>{p.label}</div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text2)' }}>{p.desc}</div>
-                  </div>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: 13, color: 'var(--text2)' }}>{p.desc}</div></div>
                   {protocol.label === p.label && <div style={{ color: 'var(--accent)', fontSize: 16 }}>✓</div>}
                 </div>
               ))}
@@ -116,19 +109,13 @@ export default function FastingTimer() {
         </>
       ) : (
         <>
-          {/* Fasting ring */}
           <div className="fasting-ring-wrap">
             <div className="fasting-circle">
               <svg width="230" height="230" viewBox="0 0 230 230">
                 <circle cx="115" cy="115" r={r} fill="none" stroke="var(--bg3)" strokeWidth="14" />
-                <circle
-                  cx="115" cy="115" r={r}
-                  fill="none"
-                  stroke={isEating ? '#4CAF82' : '#5B8DEF'}
-                  strokeWidth="14"
-                  strokeLinecap="round"
-                  strokeDasharray={circ}
-                  strokeDashoffset={offset}
+                <circle cx="115" cy="115" r={r} fill="none"
+                  stroke={isEating ? '#4CAF82' : '#5B8DEF'} strokeWidth="14" strokeLinecap="round"
+                  strokeDasharray={circ} strokeDashoffset={offset}
                   style={{ transition: 'stroke-dashoffset 0.9s linear', transformOrigin: '115px 115px', transform: 'rotate(-90deg)' }}
                 />
               </svg>
@@ -140,7 +127,6 @@ export default function FastingTimer() {
             </div>
           </div>
 
-          {/* Stats */}
           <div className="stats-row">
             <div className="stat-card">
               <div className="stat-value" style={{ color: '#5B8DEF' }}>{Math.floor(elapsed / 3600000)}h {Math.floor((elapsed % 3600000) / 60000)}m</div>
@@ -159,26 +145,20 @@ export default function FastingTimer() {
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500, marginBottom: 4 }}>Started</div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>
-                  {new Date(fastingSession.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
-                  {new Date(fastingSession.start_time).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
-                </div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Started</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{new Date(fastingSession.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{new Date(fastingSession.start_time).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</div>
               </div>
               {!isEating && (
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, color: 'var(--text2)', fontWeight: 500, marginBottom: 4 }}>Eating window opens</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#4CAF82' }}>
-                    {new Date(new Date(fastingSession.start_time).getTime() + target).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 4 }}>Eating window opens</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: '#4CAF82' }}>{new Date(new Date(fastingSession.start_time).getTime() + target).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                 </div>
               )}
             </div>
             {isEating && (
               <div style={{ marginTop: 12, background: 'var(--accent-light)', borderRadius: 10, padding: '10px 14px', color: 'var(--accent)', fontWeight: 600, fontSize: 14 }}>
-                🎉 You've completed your fast! Enjoy your meal.
+                🎉 Fast complete! Enjoy your meal.
               </div>
             )}
           </div>

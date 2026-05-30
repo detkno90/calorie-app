@@ -3,20 +3,20 @@ import { supabase } from '../lib/supabase';
 import { useApp } from '../context/AppContext';
 
 const PRESETS = [
-  { type: 'Running',        icon: '🏃', cpm: 10 },
-  { type: 'Cycling',        icon: '🚴', cpm: 8 },
-  { type: 'Swimming',       icon: '🏊', cpm: 9 },
-  { type: 'Weight Training',icon: '🏋️', cpm: 6 },
-  { type: 'HIIT',           icon: '🔥', cpm: 12 },
-  { type: 'Walking',        icon: '🚶', cpm: 5 },
-  { type: 'Yoga',           icon: '🧘', cpm: 3 },
-  { type: 'Basketball',     icon: '🏀', cpm: 8 },
-  { type: 'Football',       icon: '⚽', cpm: 9 },
-  { type: 'Jump Rope',      icon: '⚡', cpm: 13 },
+  { type: 'Running',         icon: '🏃', cpm: 10 },
+  { type: 'Cycling',         icon: '🚴', cpm: 8  },
+  { type: 'Swimming',        icon: '🏊', cpm: 9  },
+  { type: 'Weight Training', icon: '🏋️', cpm: 6  },
+  { type: 'HIIT',            icon: '🔥', cpm: 12 },
+  { type: 'Walking',         icon: '🚶', cpm: 5  },
+  { type: 'Yoga',            icon: '🧘', cpm: 3  },
+  { type: 'Basketball',      icon: '🏀', cpm: 8  },
+  { type: 'Football',        icon: '⚽', cpm: 9  },
+  { type: 'Jump Rope',       icon: '⚡', cpm: 13 },
 ];
 
 export default function WorkoutLog() {
-  const { todayWorkouts, fetchTodayWorkouts } = useApp();
+  const { todayWorkouts, fetchTodayWorkouts, user } = useApp();
   const [selected, setSelected] = useState(null);
   const [duration, setDuration] = useState(30);
   const [customCals, setCustomCals] = useState('');
@@ -35,7 +35,11 @@ export default function WorkoutLog() {
     const cals = customMode ? (parseInt(customCals) || 0) : estCals;
     if (!type || !cals) { setSaving(false); return; }
     await supabase.from('workout_logs').insert({
-      workout_type: type, duration_minutes: parseInt(duration), calories_burned: cals, date: today,
+      user_id: user.id,
+      workout_type: type,
+      duration_minutes: parseInt(duration),
+      calories_burned: cals,
+      date: today,
     });
     fetchTodayWorkouts();
     setSelected(null); setCustomType(''); setCustomCals(''); setDuration(30); setCustomMode(false);
@@ -48,20 +52,12 @@ export default function WorkoutLog() {
   return (
     <div>
       <div className="page-header">
-        <div>
-          <div className="page-subtitle">Log Activity</div>
-          <div className="page-title">Workout</div>
-        </div>
-        <button
-          className="btn btn-secondary"
-          style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}
-          onClick={() => { setCustomMode(!customMode); setSelected(null); }}
-        >
+        <div><div className="page-subtitle">Log Activity</div><div className="page-title">Workout</div></div>
+        <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} onClick={() => { setCustomMode(!customMode); setSelected(null); }}>
           {customMode ? '← Presets' : '✏️ Custom'}
         </button>
       </div>
 
-      {/* Today burned */}
       {totalBurned > 0 && (
         <div className="card" style={{ background: 'rgba(91,141,239,0.1)', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -79,11 +75,7 @@ export default function WorkoutLog() {
           <div style={{ padding: '0 16px 8px', fontSize: 13, fontWeight: 600, color: 'var(--text2)' }}>SELECT WORKOUT</div>
           <div className="workout-grid">
             {PRESETS.map(w => (
-              <div
-                key={w.type}
-                className={`workout-tile ${selected?.type === w.type ? 'selected' : ''}`}
-                onClick={() => setSelected(selected?.type === w.type ? null : w)}
-              >
+              <div key={w.type} className={`workout-tile ${selected?.type === w.type ? 'selected' : ''}`} onClick={() => setSelected(selected?.type === w.type ? null : w)}>
                 <div className="workout-tile-icon">{w.icon}</div>
                 <div className="workout-tile-name">{w.type}</div>
                 <div className="workout-tile-rate">~{w.cpm} kcal/min</div>
@@ -105,7 +97,6 @@ export default function WorkoutLog() {
         </div>
       )}
 
-      {/* Duration + log */}
       {(selected || customMode) && (
         <div className="card" style={{ marginTop: 12 }}>
           <div className="input-group">
@@ -124,7 +115,6 @@ export default function WorkoutLog() {
         </div>
       )}
 
-      {/* Today's workouts */}
       {todayWorkouts.length > 0 && (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 12 }}>TODAY'S ACTIVITY</div>

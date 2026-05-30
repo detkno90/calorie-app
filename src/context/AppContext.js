@@ -4,60 +4,90 @@ import { supabase } from '../lib/supabase';
 const AppContext = createContext();
 
 export function AppProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [todayLogs, setTodayLogs] = useState([]);
   const [todayWorkouts, setTodayWorkouts] = useState([]);
   const [fastingSession, setFastingSession] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const today = new Date().toISOString().split('T')[0];
 
-  const fetchProfile = useCallback(async () => {
-    const { data, error } = await supabase.from('profile').select('*').eq('id', 1).maybeSingle();
-    if (data) setProfile(data);
-    if (error) console.error('fetchProfile error:', error);
+  // Auth listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (!session?.user) {
+        setProfile(null);
+        setTodayLogs([]);
+        setTodayWorkouts([]);
+        setFastingSession(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  // Fetch data when user logs in
+  useEffect(() => {
+    if (user) {
+      fetchProfile();
+      fetchTodayLogs();
+      fetchTodayWorkouts();
+      fetchFastingSession();
+    }
+  }, [user]);
+
+  const fetchProfile = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase.from('profile').select('*').eq('id', user.id).maybeSingle();
+    if (data) setProfile(data);
+  }, [user]);
 
   const fetchTodayLogs = useCallback(async () => {
-    const { data, error } = await supabase.from('food_logs').select('*').eq('date', today).order('created_at', { ascending: false });
+    if (!user) return;
+    const { data } = await supabase.from('food_logs').select('*')
+      .eq('date', today).eq('user_id', user.id)
+      .order('created_at', { ascending: false });
     if (data) setTodayLogs(data);
-    if (error) console.error('fetchTodayLogs error:', error);
-  }, [today]);
+  }, [user, today]);
 
   const fetchTodayWorkouts = useCallback(async () => {
-    const { data, error } = await supabase.from('workout_logs').select('*').eq('date', today).order('created_at', { ascending: false });
+    if (!user) return;
+    const { data } = await supabase.from('workout_logs').select('*')
+      .eq('date', today).eq('user_id', user.id)
+      .order('created_at', { ascending: false });
     if (data) setTodayWorkouts(data);
-    if (error) console.error('fetchTodayWorkouts error:', error);
-  }, [today]);
+  }, [user, today]);
 
   const fetchFastingSession = useCallback(async () => {
-    const { data, error } = await supabase.from('fasting_sessions').select('*').eq('active', true).maybeSingle();
-    if (data) setFastingSession(data);
-    else setFastingSession(null);
-    if (error) console.error('fetchFastingSession error:', error);
-  }, []);
+    if (!user) return;
+    const { data } = await supabase.from('fasting_sessions').select('*')
+      .eq('active', true).eq('user_id', user.id).maybeSingle();
+    setFastingSession(data || null);
+  }, [user]);
 
-  useEffect(() => {
-    async function init() {
-      setLoading(true);
-      await Promise.all([fetchProfile(), fetchTodayLogs(), fetchTodayWorkouts(), fetchFastingSession()]);
-      setLoading(false);
-    }
-    init();
-  }, [fetchProfile, fetchTodayLogs, fetchTodayWorkouts, fetchFastingSession]);
-
-  const todayCaloriesIn = todayLogs.reduce((sum, log) => sum + (log.calories || 0), 0);
-  const todayCaloriesBurned = todayWorkouts.reduce((sum, w) => sum + (w.calories_burned || 0), 0);
+  const todayCaloriesIn = todayLogs.reduce((s, l) => s + (l.calories || 0), 0);
+  const todayCaloriesBurned = todayWorkouts.reduce((s, w) => s + (w.calories_burned || 0), 0);
   const netCalories = todayCaloriesIn - todayCaloriesBurned;
+
+  async function signOut() {
+    await supabase.auth.signOut();
+  }
 
   return (
     <AppContext.Provider value={{
+      user, authLoading, signOut,
       profile, setProfile, fetchProfile,
       todayLogs, fetchTodayLogs,
       todayWorkouts, fetchTodayWorkouts,
       fastingSession, setFastingSession, fetchFastingSession,
       todayCaloriesIn, todayCaloriesBurned, netCalories,
-      loading
     }}>
       {children}
     </AppContext.Provider>

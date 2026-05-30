@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useApp } from '../context/AppContext';
 
 export default function Settings() {
-  const { profile, fetchProfile } = useApp();
+  const { profile, fetchProfile, user, signOut } = useApp();
   const [form, setForm] = useState({
     name: '', age: '', weight_kg: '', height_cm: '',
     goal_type: 'lose', activity_level: 'moderate', daily_calorie_goal: '',
@@ -38,7 +38,7 @@ export default function Settings() {
     setSaving(true);
     try {
       const payload = {
-        id: 1,
+        id: user.id,
         name: form.name || '',
         age: parseInt(form.age) || null,
         weight_kg: parseFloat(form.weight_kg) || null,
@@ -53,7 +53,7 @@ export default function Settings() {
       showToast('Saved! ✅');
     } catch (err) {
       console.error(err);
-      showToast('Save failed — check console ❌');
+      showToast('Save failed ❌');
     }
     setSaving(false);
   }
@@ -73,9 +73,22 @@ export default function Settings() {
           <div className="page-subtitle">Personalize</div>
           <div className="page-title">Goals</div>
         </div>
+        <button className="btn btn-secondary" style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }} onClick={signOut}>
+          Sign Out
+        </button>
       </div>
 
-      {/* Personal info */}
+      {/* Account info */}
+      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+          👤
+        </div>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>{profile?.name || 'Your Account'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{user?.email}</div>
+        </div>
+      </div>
+
       <div className="card">
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 14 }}>YOUR INFO</div>
         <div className="input-group">
@@ -98,7 +111,6 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Goal selection */}
       <div className="card">
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 14 }}>YOUR GOAL</div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -110,7 +122,6 @@ export default function Settings() {
             </div>
           ))}
         </div>
-
         <div className="input-group">
           <label className="input-label">Activity Level</label>
           <select className="input" value={form.activity_level || 'moderate'} onChange={e => setForm(p => ({ ...p, activity_level: e.target.value }))}>
@@ -123,10 +134,8 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Calorie goal */}
       <div className="card">
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', marginBottom: 14 }}>DAILY CALORIE GOAL</div>
-
         {tdee && (
           <div style={{ background: 'var(--accent-light)', borderRadius: 12, padding: '14px 16px', marginBottom: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -147,15 +156,9 @@ export default function Settings() {
             </div>
           </div>
         )}
-
         <div className="input-group">
           <label className="input-label">Daily Target (kcal)</label>
-          <input
-            className="input" type="number"
-            value={form.daily_calorie_goal || ''}
-            onChange={e => setForm(p => ({ ...p, daily_calorie_goal: e.target.value }))}
-            placeholder="e.g. 1800"
-          />
+          <input className="input" type="number" value={form.daily_calorie_goal || ''} onChange={e => setForm(p => ({ ...p, daily_calorie_goal: e.target.value }))} placeholder="e.g. 1800" />
         </div>
       </div>
 
